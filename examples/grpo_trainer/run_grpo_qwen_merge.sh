@@ -17,7 +17,7 @@ test_files="['$merge_test_path']"
 MODEL_PATH=/data/app/yangyahe/base_model/Qwen-Qwen2.5-3B-Instruct
 
 # 太大会oom
-train_batch_size=1024  # 每次rollout（采样）阶段收集的总样本数量
+train_batch_size=32  # 每次rollout（采样）阶段收集的总样本数量
 ppo_mini_batch_size=32  # 11 每次梯度更新使用的样本数, 通常是train_batch_size的一个子集
 micro_batch_size=4 # 1每个GPU实际一次处理的样本数, 用于将mini_batch进一步划分，以适应GPU内存限制, 如果出现OOM，优先减小micro_batch_size
 gpu_memory_utilization=0.5

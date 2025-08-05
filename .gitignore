@@ -9,6 +9,8 @@
 **/playground
 **/wandb
 
+_temp_dir_ray
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -118,6 +120,7 @@ ENV/
 
 # data
 *.parquet
+*.jsonl
 
 
 # local logs
@@ -125,3 +128,4 @@ logs
 log
 outputs
 .history
+tensorboard_log
