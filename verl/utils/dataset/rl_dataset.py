@@ -164,6 +164,7 @@ class RLHFDataset(Dataset):
             else:
 
                 def doc2len(doc) -> int:
+                    # print(f"doc[prompt_key]: {doc[prompt_key]}, len: {len(tokenizer.apply_chat_template(doc[prompt_key], add_generation_prompt=True))}")
                     return len(tokenizer.apply_chat_template(doc[prompt_key], add_generation_prompt=True))
 
             dataframe = dataframe.filter(
@@ -259,6 +260,7 @@ class RLHFDataset(Dataset):
 
         else:
             raw_prompt = self.tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+            # print(f"raw_prompt: {raw_prompt}")
             model_inputs = self.tokenizer(raw_prompt, return_tensors="pt", add_special_tokens=False)
             input_ids = model_inputs.pop("input_ids")
             attention_mask = model_inputs.pop("attention_mask")

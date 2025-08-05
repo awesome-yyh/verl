@@ -58,6 +58,7 @@ def run_ppo(config) -> None:
         ray.init(
             runtime_env=get_ppo_ray_runtime_env(),
             num_cpus=config.ray_init.num_cpus,
+            _temp_dir="/data/app/yangyahe/verl/_temp_dir_ray"
         )
 
     # Create a remote instance of the TaskRunner class, and
