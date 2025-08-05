@@ -2,7 +2,7 @@
 Author: yangyahe yangyahe@midu.com
 Date: 2025-08-04 08:44:16
 LastEditors: yangyahe yangyahe@midu.com
-LastEditTime: 2025-08-04 21:24:44
+LastEditTime: 2025-08-05 12:24:20
 FilePath: /app/yangyahe/verl/verl/utils/reward_score/wenxiu_merge.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -41,7 +41,7 @@ def extract_solution(solution_str):
         return modification, answer
     return None, None
 
-def compute_score(solution_str, ground_truth, format_score=0.2, score=0.9, debug=False):
+def compute_score(solution_str, ground_truth, extra_info, format_score=0.2, score=0.9, debug=False):
     """The scoring function
     
     ​​格式分 (0.2分)​​：只要格式正确（包含"## 修改说明"和"## 输出结果"），即使答案错误
@@ -57,10 +57,10 @@ def compute_score(solution_str, ground_truth, format_score=0.2, score=0.9, debug
     """
     
     modification, answer = extract_solution(solution_str=solution_str)
-    src, tgt = ground_truth.split('\n\n')
+    src, tgt = extra_info["src"], ground_truth
     
     if debug or random.random() < 0.01:
-        print(f"merge_score: {solution_str}, \n___src: {src}, \nanswer: {answer}, \n_truth: {tgt}, istrue: {answer == tgt}, diff: {get_diff_details(s1=answer, s2=tgt)}")
+        print(f"merge_score: {solution_str}, \n___src: {src}, \nanswer: {answer}, \n___tgt: {tgt}, istrue: {answer == tgt}, diff: {get_diff_details(s1=answer, s2=tgt)}")
     
     if answer is None or modification is None:
         return 0
@@ -95,11 +95,11 @@ def get_diff_details(s1, s2):
     result = []
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == 'replace':
-            result.append(f"{s1[i1:i2]} --> {s2[j1:j2]}")
+            result.append(f"Replace {i1}: {s1[i1:i2]} --> {s2[j1:j2]}")
         elif tag == 'delete':
-            result.append(f"Delete: {s1[i1:i2]}")
+            result.append(f"Delete {i1}: {s1[i1:i2]}")
         elif tag == 'insert':
-            result.append(f"Insert: {s2[j1:j2]}")
+            result.append(f"Insert {j1}: {s2[j1:j2]}")
         elif tag == 'equal':
             pass  # 可以忽略，也可以记录“保留了...”
     return result

@@ -35,8 +35,8 @@ def parse_line(line: str) -> Tuple[str, str]:
 def txt_to_parquet(
     input_path: str,
     output_path: str,
-    data_source: str = "custom",
-    ability: str = "general",
+    data_source: str = "anli_ft",
+    ability: str = "correct_merge",
     instruction: str = "Let's think step by step and output the final tgt after \"####\".",
     split: str = "train"
 ):
@@ -106,7 +106,7 @@ def txt_to_parquet(
                             {"role": "user", "content": f"{user_input}"}
                         ],
                         "ability": ability,
-                        "reward_model": {"style": "rule", "ground_truth": f"{src}\n\n{tgt}"},
+                        "reward_model": {"style": "rule", "ground_truth": tgt},
                         "extra_info": {
                             "split": split,
                             "index": i,
