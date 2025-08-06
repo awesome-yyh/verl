@@ -59,8 +59,8 @@ def compute_score(solution_str, ground_truth, extra_info, format_score=0.2, scor
     modification, answer = extract_solution(solution_str=solution_str)
     src, tgt = extra_info["src"], ground_truth
     
-    if debug or random.random() < 0.01:
-        print(f"merge_score: {solution_str}, \n___src: {src}, \nanswer: {answer}, \n___tgt: {tgt}, istrue: {answer == tgt}, diff: {get_diff_details(s1=answer, s2=tgt)}")
+    if debug or random.random() < 0.001:
+        print(f"merge_score: {solution_str}, \nsrc: {src}, \nllm: {answer}, \ntgt: {tgt}, ismodify: {answer != src}, istrue: {answer == tgt}, llm_diff: {get_diff_details(s1=src, s2=answer)}, should_diff: {get_diff_details(s1=src, s2=tgt)}")
     
     if answer is None or modification is None:
         return 0
