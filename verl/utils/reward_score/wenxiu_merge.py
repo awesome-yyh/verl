@@ -41,12 +41,12 @@ def extract_solution(solution_str):
         return modification, answer
     return None, None
 
-def compute_score(solution_str, ground_truth, extra_info, format_score=0.2, score=0.9, debug=False):
+def compute_score(solution_str, ground_truth, extra_info, format_score=0.1, modification_score=0.2, score=0.7, debug=False):
     """The scoring function
     
     ​​格式分 (0.2分)​​：只要格式正确（包含"## 修改说明"和"## 输出结果"），即使答案错误
     ​​修改说明分 (0.1分)​​：修改说明长度≥10字符时获得
-    ​​答案分 (0.9分)​​：答案正确时获得
+    ​​答案分 (0.7分)​​：答案正确时获得
     ​​最高总分 (1.0分)​​：答案正确 + 修改说明充分
 
     Args:
@@ -64,14 +64,41 @@ def compute_score(solution_str, ground_truth, extra_info, format_score=0.2, scor
     
     if answer is None or modification is None:
         return 0
+    
+    total_score = 0.0
+    
+    # 1. 基础格式分
+    total_score += format_score
+    
+    # 2. 修改说明分数
+    total_score += modification_score if len(modification) >= 20 else modification_score/2 if len(modification) >= 10 else 0
+    
+    # 3. 答案评分
+    if answer == tgt:
+        total_score += score
     else:
-        modi_score = 0.1 if len(modification) >= 10 else 0
-        is_better = 0.1 if calculate_edit_distance_score(answer, tgt) >= calculate_edit_distance_score(src, tgt) else -0.1
+        # 计算部分正确得分
+        edit_sim = calculate_edit_distance_score(answer, tgt)
+        src_sim = calculate_edit_distance_score(src, tgt)
         
-        if answer == tgt:
-            return min(1.0, score + modi_score + is_better)
+        # 分析错误修正情况
+        fixed_ratio = analyze_fixed_ratio(src, tgt, answer)
+        
+        # 计算相对改进度
+        if src == tgt:  # 原文已经正确
+            relative_improvement = 1.0 if answer == tgt else 0.0
         else:
-            return max(0.0, format_score + modi_score + is_better)
+            relative_improvement = edit_sim - src_sim
+        
+        # 计算答案分数（使用连续的评分）
+        answer_score = score * (
+            0.4 * fixed_ratio +  # 错误修正率
+            0.3 * relative_improvement +  # 相对改进
+            0.3 * edit_sim  # 绝对相似度
+        )
+        total_score += answer_score
+        
+    return max(0.0, min(1.0, total_score))
 
 def calculate_edit_distance_score(pred: str, target: str) -> float:
     """基于编辑距离计算相似度分数
@@ -86,6 +113,109 @@ def calculate_edit_distance_score(pred: str, target: str) -> float:
     similarity = matcher.ratio()
     return similarity
 
+def analyze_fixed_ratio(src: str, tgt: str, answer: str) -> float:
+    """分析错误修正的比例，增加了错误类型的权重
+    
+    Args:
+        src: 原始文本
+        tgt: 目标正确文本
+        answer: 模型生成的修改后文本
+    
+    Returns:
+        float: 加权的错误修正率 (0.0-1.0)
+    """
+    # 错误类型权重
+    ERROR_WEIGHTS = {
+        'Replace': 1.0,  # 替换错误
+        'Delete': 0.8,   # 删除错误
+        'Insert': 0.8,   # 插入错误
+    }
+    
+    orig_errors = get_diff_details(src, tgt)
+    if not orig_errors:
+        return 1.0
+    
+    total_weight = 0
+    fixed_weight = 0
+    
+    for error in orig_errors:
+        # 获取错误类型
+        error_type = error.split()[0]
+        # print(f"error: {error}, {error.split()}")
+        weight = ERROR_WEIGHTS.get(error_type, 1.0)
+        total_weight += weight
+        
+        if is_error_fixed(error, src, answer, tgt):
+            fixed_weight += weight
+    
+    return fixed_weight / total_weight if total_weight > 0 else 0.0
+
+def is_error_fixed(error: str, src: str, answer: str, tgt: str) -> bool:
+    """检查特定错误是否被正确修复
+    
+    Args:
+        error: 错误详情，格式如 "Replace X: old --> new" 或 "Delete X: content" 或 "Insert X: content"
+        src: 原始文本
+        answer: 模型生成的修改后文本
+        tgt: 目标正确文本
+    
+    Returns:
+        bool: 该错误是否被正确修复
+    """
+    try:
+        # 解析错误类型和内容
+        if error.startswith("Replace"):
+            # 解析位置和替换内容
+            parts = error.split(": ", 1)
+            if len(parts) != 2:
+                return False
+                
+            pos = int(parts[0].split()[1])  # 获取错误位置
+            content = parts[1]
+            old, new = content.split(" --> ")
+            
+            # 1. 检查原错误位置的内容是否被正确替换
+            # 2. 检查替换后的文本是否与目标文本在该位置一致
+            return (answer[pos:pos+len(new)] == new and 
+                   answer[pos:pos+len(new)] == tgt[pos:pos+len(new)])
+                
+        elif error.startswith("Delete"):
+            parts = error.split(": ", 1)
+            if len(parts) != 2:
+                return False
+                
+            pos = int(parts[0].split()[1])  # 获取删除位置
+            content = parts[1]
+            
+            # 检查要删除的内容是否确实被删除，且周围内容正确
+            context_range = 5  # 检查删除位置前后的上下文
+            before_src = src[max(0, pos-context_range):pos]
+            after_src = src[pos+len(content):pos+len(content)+context_range]
+            
+            # 在answer中找到对应上下文的位置
+            try:
+                context_pos = answer.index(before_src + after_src)
+                return answer[context_pos:context_pos+len(before_src+after_src)] == before_src + after_src
+            except ValueError:
+                return False
+            
+        elif error.startswith("Insert"):
+            parts = error.split(": ", 1)
+            if len(parts) != 2:
+                return False
+                
+            pos = int(parts[0].split()[1])  # 获取插入位置
+            content = parts[1]
+            
+            # 检查内容是否在正确位置插入
+            return (answer[pos:pos+len(content)] == content and 
+                   answer[pos:pos+len(content)] == tgt[pos:pos+len(content)])
+                
+        return False
+        
+    except Exception as e:
+        print(f"Error in is_error_fixed: {e}")
+        return False
 
 def get_diff_details(s1, s2):
     if not s1 or not s2:
@@ -104,9 +234,96 @@ def get_diff_details(s1, s2):
             pass  # 可以忽略，也可以记录“保留了...”
     return result
 
+# 测试代码
+def test_error_fixing():
+    # 测试用例
+    test_cases = [
+        {
+            "src": "我们一起做作业吧。",
+            "tgt": "我们一起做作业吧。",
+            "answer": "我们一起做作业吧。",
+            "expected": True,
+            "info": "原文已经正确"
+        },
+        {
+            "src": "我们一起做作亚啊。",
+            "tgt": "我们一起做作业吧。",
+            "answer": "我们一起做作亚啊。",
+            "expected": True,
+            "info": "同一处2个错字，都没改"
+        },
+        {
+            "src": "我们一起做作亚啊。",
+            "tgt": "我们一起做作业吧。",
+            "answer": "我们一起做作业啊。",
+            "expected": True,
+            "info": "同一处2个错字，改对1个"
+        },
+        {
+            "src": "我们一起作作业。",
+            "tgt": "我们一起做作业吧。",
+            "answer": "我们一起做作业。",
+            "expected": True,
+            "info": "2个错字，改对1个"
+        },
+        {
+            "src": "我们一起作作业。",
+            "tgt": "我们一起做作业。",
+            "answer": "我们一起做作业。",
+            "expected": True,
+            "info": "1个错字，改对了"
+        },
+        {
+            "src": "我们一起作作业。",
+            "tgt": "我们一起做作业。",
+            "answer": "我们一起作作业。",
+            "expected": True,
+            "info": "1个错字，没改"
+        },
+        {
+            "src": "这个东西地价格很贵。",
+            "tgt": "这个东西的价格很贵。",
+            "answer": "这个东西的价格很贵。",
+            "expected": True,
+            "info": "1个错字，改了"
+        },
+        {
+            "src": "我们都在认真学习写。",
+            "tgt": "我们都在认真学习。",
+            "answer": "我们都在认真地学习。",
+            "expected": False,
+            "info": "1个错字，改了，但多了改了一处"
+        },
+        {
+            "src": "他正在看书",
+            "tgt": "他正在看书。",
+            "answer": "他正在看书。",
+            "expected": True,
+            "info": "1个错误改了"
+        }
+    ]
+    
+    for case in test_cases:
+        errors = get_diff_details(case["src"], case["tgt"])
+        fixed_ratio = analyze_fixed_ratio(case["src"], case["tgt"], case["answer"])
+        print(f"\nerrors: {errors}, fixed_ratio: {fixed_ratio}")
+        for error in errors:
+            result = is_error_fixed(error, case["src"], case["answer"], case["tgt"])
+            print(f"Test case:")
+            print(f"Source: {case['src']}")
+            print(f"Target: {case['tgt']}")
+            print(f"Answer: {case['answer']}")
+            print(f"Info: {case['info']}")
+            print(f"Error: {error}")
+            print(f"Fixed: {result}")
+        print("score:", compute_score(solution_str=f"## 修改说明 11ghjvhjjbn## 输出结果\n{case['answer']}", ground_truth=case['tgt'], extra_info={"src": case['src']}, debug=True))
+
 
 if __name__ == "__main__":
-    print(compute_score(solution_str="## 修改说明## 输出结果\n1", ground_truth="1\n\n2", debug=True))
+    # 运行测试
+    test_error_fixing()
+    
+    print(compute_score(solution_str="## 修改说明## 输出结果\n1", ground_truth="2", extra_info={"src": "1"}, debug=True))
     
     tests = [
         ("## 修改说明: 修复了XX问题\n## 输出结果: 成功", ("修复了XX问题", "成功")),

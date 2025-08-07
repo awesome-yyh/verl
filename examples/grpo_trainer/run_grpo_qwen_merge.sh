@@ -26,14 +26,14 @@ MODEL_PATH=/data/app/yangyahe/base_model/Qwen-Qwen2.5-3B-Instruct
 # 1024/1024/64: Training Progress:   0%|          | 42/11535 [19:28<1859:09:57, 582.35s/it]
 
 train_batch_size=1024  # train_batch_size * rollout_n 即为每次rollout（采样）阶段收集的总样本数量
-ppo_mini_batch_size=1024  # 采样的响应被划分的batch，用于更新actor，是所有worker的全局大小
+ppo_mini_batch_size=256  # 采样的响应被划分的batch，用于更新actor，是所有worker的全局大小
 micro_batch_size=64 # 每个GPU实际一次处理的样本数, 用于将mini_batch进一步划分，以适应GPU内存限制, 如果出现OOM，优先减小micro_batch_size
 gpu_memory_utilization=0.5
 
 # 太大会训练不稳定
-lr=1e-6
-kl_loss_coef=0.001
-rollout_n=8  # grpo的群组大小
+lr=2e-6
+kl_loss_coef=0.002
+rollout_n=16  # grpo的群组大小
 
 # use_kl_loss 对于grpo需要设置为true, DrGRPO需要设置为false
 
@@ -58,7 +58,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=$kl_loss_coef \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
-    actor_rollout_ref.actor.entropy_coeff=0 \
+    actor_rollout_ref.actor.entropy_coeff=0.01 \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
