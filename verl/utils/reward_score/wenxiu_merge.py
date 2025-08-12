@@ -2,7 +2,7 @@
 Author: yangyahe yangyahe@midu.com
 Date: 2025-08-04 08:44:16
 LastEditors: yangyahe yangyahe@midu.com
-LastEditTime: 2025-08-05 12:24:20
+LastEditTime: 2025-08-12 11:30:45
 FilePath: /app/yangyahe/verl/verl/utils/reward_score/wenxiu_merge.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -23,6 +23,8 @@ Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查�
 import difflib
 import random
 import re
+import datetime
+from collections import Counter
 
 _SOLUTION_CLIP_CHARS = 512
 
@@ -41,7 +43,7 @@ def extract_solution(solution_str):
         return modification, answer
     return None, None
 
-def compute_score(solution_str, ground_truth, extra_info, format_score=0.1, modification_score=0.2, score=0.7, debug=False):
+def compute_score(solution_str, ground_truth, extra_info, format_score=0.1, modification_score=0.2, answer_score=0.7, debug=False):
     """The scoring function
     
     ​​格式分 (0.2分)​​：只要格式正确（包含"## 修改说明"和"## 输出结果"），即使答案错误
@@ -53,17 +55,18 @@ def compute_score(solution_str, ground_truth, extra_info, format_score=0.1, modi
         solution_str: the solution text
         ground_truth: the ground truth
         format_score: the score for the format
-        score: the score for the correct answer
+        answer_score: the score for the correct answer
     """
     
     modification, answer = extract_solution(solution_str=solution_str)
     src, tgt = extra_info["src"], ground_truth
     
     if debug or random.random() < 0.001:
-        print(f"merge_score: {solution_str}, \nsrc: {src}, \nllm: {answer}, \ntgt: {tgt}, ismodify: {answer != src}, istrue: {answer == tgt}, llm_diff: {get_diff_details(s1=src, s2=answer)}, should_diff: {get_diff_details(s1=src, s2=tgt)}")
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+        print(f"merge_score: {solution_str}, \nsrc: {src}, \nllm: {answer}, \ntgt: {tgt}, ismodify: {answer != src}, istrue: {answer == tgt}, llm_diff: {get_diff_details(s1=src, s2=answer)}, should_diff: {get_diff_details(s1=src, s2=tgt)}, time_now: {timestamp}")
     
-    if answer is None or modification is None:
-        return 0
+    if answer is None or modification is None or calculate_ngram_repetition_rate(text=modification):
+        return 0.0
     
     total_score = 0.0
     
@@ -71,30 +74,24 @@ def compute_score(solution_str, ground_truth, extra_info, format_score=0.1, modi
     total_score += format_score
     
     # 2. 修改说明分数
-    total_score += modification_score if len(modification) >= 20 else modification_score/2 if len(modification) >= 10 else 0
+    total_score += modification_score if len(modification) >= 15 else 0
     
     # 3. 答案评分
     if answer == tgt:
-        total_score += score
-    else:
-        # 计算部分正确得分
-        edit_sim = calculate_edit_distance_score(answer, tgt)
-        src_sim = calculate_edit_distance_score(src, tgt)
-        
+        total_score += answer_score
+    else:  # 答案不正确
         # 分析错误修正情况
         fixed_ratio = analyze_fixed_ratio(src, tgt, answer)
         
         # 计算相对改进度
-        if src == tgt:  # 原文已经正确
-            relative_improvement = 1.0 if answer == tgt else 0.0
-        else:
-            relative_improvement = edit_sim - src_sim
+        edit_sim = calculate_edit_distance_score(answer, tgt)
+        src_sim = calculate_edit_distance_score(src, tgt)
+        relative_improvement = edit_sim - src_sim
         
         # 计算答案分数（使用连续的评分）
-        answer_score = score * (
+        answer_score = answer_score * 0.5 * (  # 如果答案不正确，最多也只有0.5
             0.4 * fixed_ratio +  # 错误修正率
-            0.3 * relative_improvement +  # 相对改进
-            0.3 * edit_sim  # 绝对相似度
+            0.6 * relative_improvement # 相对改进
         )
         total_score += answer_score
         
@@ -216,6 +213,21 @@ def is_error_fixed(error: str, src: str, answer: str, tgt: str) -> bool:
     except Exception as e:
         print(f"Error in is_error_fixed: {e}")
         return False
+
+def calculate_ngram_repetition_rate(text: str, n: int = 4, threshold: int = 0.4) -> float:
+    """计算文本的n-gram重复率"""
+    tokens = list(text.strip())
+    if len(tokens) < n:
+        return 0.0
+    
+    # 生成n-gram并计数
+    ngrams = [tuple(tokens[i:i+n]) for i in range(len(tokens)-n+1)]
+    counts = Counter(ngrams)
+    # print(counts)
+    # print((sum(counts.values()) - len(counts)) / len(ngrams))
+    # 计算重复率：(总出现次数 - 独特n-gram数) / 总n-gram数
+    return (sum(counts.values()) - len(counts)) / len(ngrams) > threshold
+    
 
 def get_diff_details(s1, s2):
     if not s1 or not s2:

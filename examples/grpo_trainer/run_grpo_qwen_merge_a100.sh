@@ -3,13 +3,13 @@ set -x
 # 包含正确句的比例: 394621 / 787030 = 0.50, 正确到正确的比例: 248742 / 787030 = 0.32
 # 包含正确句的比例: 502 / 968 = 0.52, 正确到正确的比例: 322 / 968 = 0.33
 
-# merge_train_path="data/anli_ft_train_system_tgt_add_src.parquet"
-# merge_test_path="data/anli_ft_test_system_tgt_add_src.parquet"
-# project_name=verl_grpo_merge
+merge_train_path="data/anli_ft_train_system_tgt_add_src.parquet"
+merge_test_path="data/anli_ft_test_system_tgt_add_src.parquet"
+project_name=verl_grpo_merge
 
-merge_train_path="data/anli_ft_correct_train.parquet"
-merge_test_path="data/anli_ft_correct_test.parquet"
-project_name=verl_grpo_correct
+# merge_train_path="data/anli_ft_correct_train.parquet"
+# merge_test_path="data/anli_ft_correct_test.parquet"
+# project_name=verl_grpo_correct
 
 # merge_train_path=$merge_test_path  # 临时测试
 
@@ -26,13 +26,13 @@ MODEL_PATH=/data/app/yangyahe/base_model/Qwen-Qwen2.5-3B-Instruct
 # 32/32/32: Training Progress:   4%|▎         | 49/1395 [05:02<11:23:38, 30.47s/it]
 # 1024/32/32: 几分钟直接训练完...
 
-train_batch_size=128  # train_batch_size * rollout_n 即为每次rollout（采样）阶段收集的总样本数量
+train_batch_size=256  # train_batch_size * rollout_n 即为每次rollout（采样）阶段收集的总样本数量
 ppo_mini_batch_size=64  # 采样的响应被划分的batch，用于更新actor，是所有worker的全局大小
-micro_batch_size=8 # 每个GPU实际一次处理的样本数, 用于将mini_batch进一步划分，以适应GPU内存限制, 如果出现OOM，优先减小micro_batch_size
+micro_batch_size=32 # 每个GPU实际一次处理的样本数, 用于将mini_batch进一步划分，以适应GPU内存限制, 如果出现OOM，优先减小micro_batch_size
 gpu_memory_utilization=0.5
-n_gpus_per_node=4
-CUDA_VISIBLE_DEVICES="4,5,6,7"
-save_freq=4
+n_gpus_per_node=2
+CUDA_VISIBLE_DEVICES="6,7"
+save_freq=6
 
 # 太大会训练不稳定
 lr=1e-6
