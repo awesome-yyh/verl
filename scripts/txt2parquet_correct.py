@@ -7,7 +7,12 @@ import random
 import pandas as pd
 from datasets import Dataset
 from typing import List, Dict, Tuple, Optional
+    
+"""
+python scripts/txt2parquet_correct.py --input data/anli_ft.jsonl --output data/anli_ft_correct_train.parquet --data_source anli_ft --split train
 
+python scripts/txt2parquet_correct.py --input data/anli_ft.jsonl --output data/anli_ft_correct_test.parquet --data_source anli_ft --split test
+"""
 
 def parse_line(line: str) -> Tuple[str, str]:
     """
@@ -67,7 +72,9 @@ def txt_to_parquet(
     with open(input_path, "r", encoding="utf-8") as f:
         for i, line in tqdm(enumerate(f), total=3211817):
             try:
-                if split == "test" and random.random() > 1/787*3:
+                if split == "train" and random.random() > 1/787*30/4:
+                    continue
+                if split == "test" and random.random() > 1/787:
                     continue
                 
                 parsed = parse_line(line)
@@ -107,6 +114,8 @@ def txt_to_parquet(
     
     # 转换为Parquet
     df = pd.DataFrame(samples)
+    num_samples = df.shape[0]
+    print(f"DataFrame 中的数据条数为: {num_samples}")
     dataset = Dataset.from_pandas(df)
     
     # 创建输出目录

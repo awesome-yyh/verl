@@ -2,7 +2,7 @@
 Author: yangyahe yangyahe@midu.com
 Date: 2025-08-04 08:44:16
 LastEditors: yangyahe yangyahe@midu.com
-LastEditTime: 2025-08-12 11:30:45
+LastEditTime: 2025-08-26 11:55:42
 FilePath: /app/yangyahe/verl/verl/utils/reward_score/wenxiu_merge.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -94,7 +94,11 @@ def compute_score(solution_str, ground_truth, extra_info, format_score=0.1, modi
             0.6 * relative_improvement # 相对改进
         )
         total_score += answer_score
-        
+    
+    if debug or random.random() < 0.01:
+        print(f"==total_score: {total_score}")
+        print(f"merge_score: {solution_str}, \nsrc: {src}, \nllm: {answer}, \ntgt: {tgt}, ismodify: {answer != src}, istrue: {answer == tgt}, llm_diff: {get_diff_details(s1=src, s2=answer)}, should_diff: {get_diff_details(s1=src, s2=tgt)}, total_score: {total_score}")
+    
     return max(0.0, min(1.0, total_score))
 
 def calculate_edit_distance_score(pred: str, target: str) -> float:
@@ -130,7 +134,7 @@ def analyze_fixed_ratio(src: str, tgt: str, answer: str) -> float:
     
     orig_errors = get_diff_details(src, tgt)
     if not orig_errors:
-        return 1.0
+        return 1.0 if answer == tgt else 0.0
     
     total_weight = 0
     fixed_weight = 0
@@ -312,6 +316,13 @@ def test_error_fixing():
             "answer": "他正在看书。",
             "expected": True,
             "info": "1个错误改了"
+        },
+        {
+            "src": "他不是正在看书",
+            "tgt": "他正在看书。",
+            "answer": "他正在看树。",
+            "expected": True,
+            "info": "1个错误改了"
         }
     ]
     
@@ -327,7 +338,7 @@ def test_error_fixing():
             print(f"Answer: {case['answer']}")
             print(f"Info: {case['info']}")
             print(f"Error: {error}")
-            print(f"Fixed: {result}")
+            print(f"=== Fixed: {result}")
         print("score:", compute_score(solution_str=f"## 修改说明 11ghjvhjjbn## 输出结果\n{case['answer']}", ground_truth=case['tgt'], extra_info={"src": case['src']}, debug=True))
 
 
