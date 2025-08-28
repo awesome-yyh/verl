@@ -101,5 +101,5 @@ class FSDPEngineConfig(BaseConfig):
     reshard_after_forward: bool = True
     fsdp_size: int = -1
     forward_prefetch: bool = False
-    model_dtype: str = "fp32"
+    model_dtype: str = "bf16"
     use_orig_params: bool = False

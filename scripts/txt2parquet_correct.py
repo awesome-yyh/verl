@@ -12,6 +12,16 @@ from typing import List, Dict, Tuple, Optional
 python scripts/txt2parquet_correct.py --input data/anli_ft.jsonl --output data/anli_ft_correct_train.parquet --data_source anli_ft --split train
 
 python scripts/txt2parquet_correct.py --input data/anli_ft.jsonl --output data/anli_ft_correct_test.parquet --data_source anli_ft --split test
+
+python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/www_merge正报案例_6c95cea9-572b-4d52-8b06-40662069d770.csv_test_doubao_explanation-x.jsonl --output data/www_merge正报案例_6c95cea9-572b-4d52-8b06-40662069d770.csv_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
+
+python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/魔方拦截案例_f97589df-e3b8-47e2-aba4-62197fa5d667.csv_test_doubao_explanation-x.jsonl --output data/魔方拦截案例_f97589df-e3b8-47e2-aba4-62197fa5d667.csv_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
+
+python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/魔方误拦截all.csv_015f309d-b27d-4f16-9381-c3a737d403d8.txt_test_doubao_explanation-x.jsonl --output data/魔方误拦截all.csv_015f309d-b27d-4f16-9381-c3a737d403d8.txt_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
+
+python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/merge_wubao.csv_replace_key_acd4168d-f405-4791-afce-6f2c8e59fbad.csv_test_doubao_explanation-x.jsonl --output data/merge_wubao.csv_replace_key_acd4168d-f405-4791-afce-6f2c8e59fbad.csv_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
+
+python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/merge_loubao.csv_replace_key_0df02291-7803-4eec-94c1-923c13226849.csv_test_doubao_explanation-x.jsonl --output data/merge_loubao.csv_replace_key_0df02291-7803-4eec-94c1-923c13226849.csv_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
 """
 
 def parse_line(line: str) -> Tuple[str, str]:
@@ -27,10 +37,16 @@ def parse_line(line: str) -> Tuple[str, str]:
     try:
         sents_map = ast.literal_eval(line)
 
-        src = sents_map.pop("sentence")
-        tgt = sents_map.pop("corr_sentence")
+        # yinkai提供的格式
+        # src = sents_map.pop("sentence")
+        # tgt = sents_map.pop("corr_sentence")
         
-        return src, tgt
+        # 新格式
+        src = sents_map["src"]
+        tgt = sents_map["tgt"]
+        explanation = sents_map["llm_txt"]
+        
+        return src, tgt, explanation
     except Exception as e:
         print(f"解析错误: {line}")
         return None
@@ -40,7 +56,7 @@ def txt_to_parquet(
     input_path: str,
     output_path: str,
     data_source: str = "anli_ft",
-    ability: str = "correct_merge",
+    ability: str = "correct_x",
     instruction: str = "Let's think step by step and output the final tgt after \"####\".",
     split: str = "train"
 ):
@@ -72,14 +88,14 @@ def txt_to_parquet(
     with open(input_path, "r", encoding="utf-8") as f:
         for i, line in tqdm(enumerate(f), total=3211817):
             try:
-                if split == "train" and random.random() > 1/787*30/4:
-                    continue
+                # if split == "train" and random.random() > 1/787*30/4:
+                    # continue
                 if split == "test" and random.random() > 1/787:
                     continue
                 
                 parsed = parse_line(line)
                 if parsed:
-                    src, tgt = parsed
+                    src, tgt, explanation = parsed
                     
                     if src == tgt:
                         count_t2t += 1                    
@@ -101,6 +117,7 @@ def txt_to_parquet(
                             "index": i,
                             "tgt": tgt,
                             "src": src,
+                            "explanation": explanation,
                             "source_line": line.strip()
                         }
                     })
@@ -132,7 +149,7 @@ if __name__ == "__main__":
     parser.add_argument("--input", required=True, help="输入TXT文件路径")
     parser.add_argument("--output", required=True, help="输出Parquet文件路径")
     parser.add_argument("--data_source", required=True, help="数据来源标识")
-    parser.add_argument("--ability", default="correct_merge", help="数据类型 (math/code/commonsense等)")
+    parser.add_argument("--ability", default="correct_x", help="数据类型 (math/code/commonsense等)")
     parser.add_argument("--split", default="train", choices=["train", "validation", "test"], help="数据集划分")
     
     args = parser.parse_args()
