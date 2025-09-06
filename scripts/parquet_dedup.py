@@ -103,6 +103,9 @@ def deduplicate_parquet(input_path, output_path, keep='first'):
 if __name__ == "__main__":
     # 配置文件路径
     input_file = "data/www_merge_拦截_correct_merge_train.parquet"
+    input_file = "data/www_merge_拦截_correct_merge_train_anli_ft.parquet"
+    input_file = "data/anli_ft_lanjie_merge_x_train.parquet"
+    input_file = "data/anli_ft_lanjie_merge_x_train_deduplicated_shuffled_all2x.parquet"
     output_file = input_file.replace(".parquet", "_deduplicated.parquet")  # 去重后的输出文件路径
     
     # 执行去重

@@ -49,23 +49,38 @@ def merge_parquet_files(input_files, output_file):
 
 if __name__ == "__main__":
     # 在这里添加所有需要合并的Parquet文件路径
+    # parquet_files = [
+    #     'data/anli_ft_correct_train_shuffled.parquet',
+    #     'data/anli_ft_merge_train_shuffled.parquet',
+    #     # 
+    #     "data/anli_ft_train_system_tgt_add_src.parquet"
+    #     "data/anli_ft_correct_merge_train_shuffled_shuffled.parquet",
+    #     "data/www_merge_lanjie_correct_merge_train_anli_ft_deduplicated_shuffled.parquet",
+    #     "data/anli_ft_correct_train.parquet",
+        
+    #     # merge 正误报 训练x
+    #     'data/www_merge正报案例_6c95cea9-572b-4d52-8b06-40662069d770.csv_test_doubao_explanation-x_train.parquet',
+    #     'data/拦截案例_f97589df-e3b8-47e2-aba4-62197fa5d667.csv_test_doubao_explanation-x_train.parquet',
+    #     'data/误拦截all.csv_015f309d-b27d-4f16-9381-c3a737d403d8.txt_test_doubao_explanation-x_train.parquet',
+    #     'data/merge_wubao.csv_replace_key_acd4168d-f405-4791-afce-6f2c8e59fbad.csv_test_doubao_explanation-x_train.parquet',
+    #     'data/merge_loubao.csv_replace_key_0df02291-7803-4eec-94c1-923c13226849.csv_test_doubao_explanation-x_train.parquet',
+    #     # merge 正误报 训练merge
+    #     'data/www_merge正报案例_6c95cea9-572b-4d52-8b06-40662069d770.csv_test_doubao_explanation_train.parquet',
+    #     'data/拦截案例_f97589df-e3b8-47e2-aba4-62197fa5d667.csv_test_doubao_explanation-merge_train.parquet',
+    #     'data/误拦截all.csv_015f309d-b27d-4f16-9381-c3a737d403d8.txt_test_doubao_explanation-merge_train.parquet',
+    #     'data/merge_wubao.csv_replace_key_acd4168d-f405-4791-afce-6f2c8e59fbad.csv_test_doubao_explanation-merge_train.parquet',
+    #     'data/merge_loubao.csv_replace_key_0df02291-7803-4eec-94c1-923c13226849.csv_test_doubao_explanation-merge_train.parquet',
+    # ]
+    # output_file = 'data/www_merge_拦截_correct_merge_train_anli_ft.parquet'
     parquet_files = [
-        # 'data/anli_ft_correct_train_shuffled.parquet',
-        # 'data/anli_ft_merge_train_shuffled.parquet',
-        'data/www_merge正报案例_6c95cea9-572b-4d52-8b06-40662069d770.csv_test_doubao_explanation-x_train.parquet',
-        'data/魔方拦截案例_f97589df-e3b8-47e2-aba4-62197fa5d667.csv_test_doubao_explanation-x_train.parquet',
-        'data/魔方误拦截all.csv_015f309d-b27d-4f16-9381-c3a737d403d8.txt_test_doubao_explanation-x_train.parquet',
-        'data/merge_wubao.csv_replace_key_acd4168d-f405-4791-afce-6f2c8e59fbad.csv_test_doubao_explanation-x_train.parquet',
-        'data/merge_loubao.csv_replace_key_0df02291-7803-4eec-94c1-923c13226849.csv_test_doubao_explanation-x_train.parquet',
-        'data/www_merge正报案例_6c95cea9-572b-4d52-8b06-40662069d770.csv_test_doubao_explanation_train.parquet',
-        'data/魔方拦截案例_f97589df-e3b8-47e2-aba4-62197fa5d667.csv_test_doubao_explanation-merge_train.parquet',
-        'data/魔方误拦截all.csv_015f309d-b27d-4f16-9381-c3a737d403d8.txt_test_doubao_explanation-merge_train.parquet',
-        'data/merge_wubao.csv_replace_key_acd4168d-f405-4791-afce-6f2c8e59fbad.csv_test_doubao_explanation-merge_train.parquet',
-        'data/merge_loubao.csv_replace_key_0df02291-7803-4eec-94c1-923c13226849.csv_test_doubao_explanation-merge_train.parquet',
+        "data/anli_ft_train_system_tgt_add_src.parquet",
+        "data/anli_ft_correct_merge_train_shuffled_shuffled.parquet",
+        "data/anli_ft_correct_train.parquet",
+        "data/www_merge_lanjie_correct_merge_train_anli_ft_deduplicated_shuffled.parquet"
     ]
     
     # 合并后的输出文件路径
-    output_file = 'data/www_merge_拦截_correct_merge_train.parquet'
+    output_file = "data/anli_ft_lanjie_merge_x_train.parquet"
     
     # 执行合并
     merge_parquet_files(parquet_files, output_file)

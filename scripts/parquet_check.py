@@ -5,22 +5,28 @@ from collections import Counter
 # 文件路径
 # merge_path="data/anli_ft_correct_merge_train_shuffled_shuffled.parquet"
 # merge_path="data/anli_ft_correct_merge_test_shuffled_shuffled.parquet"
-merge_path="../term-corrector/data/www_merge_拦截_correct_merge_train_deduplicated_shuffled.parquet"
-merge_path="../term-corrector/data/www_merge_拦截_correct_merge_train_anli_ft_deduplicated_shuffled.parquet"
-# merge_path="../term-corrector/data/anli_ft_correct_merge_test_shuffled_shuffled.parquet"
-merge_path="data/anli_ft_lanjie_merge_x_train_deduplicated_shuffled_all2x_deduplicated_shuffled_error_correct_noop.parquet"
+merge_path="data/www_merge_拦截_correct_merge_train_deduplicated_shuffled.parquet"
 
-print("读取数据...")
+
+merge_path="data/anli_ft_train_system_tgt_add_src.parquet"  # 78w7682, merge，待去重, src == tgt 的比例:(31.60%)  # 'source_line': '{"bcm_base": "中华人民共和国税收征收管理法", "bcm_finetune": "中华人民共和国税收征收管理法", "ctc_gec": "中华人民共和国税收征收管理法", "ctc_csc": "中华人民共和国税收征收管理法", "ctc_woe": "中华人民共和国税收征收管理法", "std": "中华人民共和国税收征收管理法", "sentence": "中华人民共和国税收征收管理法", "corr_sentence": "中华人民共和国税收征收管理法"}',
+merge_path="data/anli_ft_correct_merge_train_shuffled_shuffled.parquet"  # 6w0156, x, 待去重，src == tgt 的比例: 41.83%，ability='correct_x'
+# merge_path="data/anli_ft_correct_train.parquet"  # 12w2078, x, 待去重，src == tgt 的比例: 52.11% ability: correct_x
+
+# merge_path="data/www_merge_lanjie_correct_merge_train_anli_ft_deduplicated_shuffled.parquet"  # 2w3932, x+merge, src == tgt 的比例: 34.90%  ability='correct_merge'/'correct_x' 各一半， jdt_map values 包含 tgt 的比例: 58.42%
+
+merge_path = "data/anli_ft_lanjie_merge_x_train_deduplicated_shuffled.parquet" # 91w0936, 待任务均衡correct_merge: 79.59%，correct_x: 20.41%，x:src == tgt 的比例: 46.98%, merge: src == tgt 的比例: 31.28%, jdt_map values 包含 tgt 的比例: 51.72%, 
+
+merge_path = "data/anli_ft_lanjie_merge_x_train_deduplicated_shuffled_all2x_deduplicated_shuffled.parquet"  # 83w5286, correct_x: 100.00%, 待修改提示词，src == tgt 的比例: 34.55%
+merge_path = "data/anli_ft_lanjie_merge_x_train_deduplicated_shuffled_all2x_deduplicated_shuffled_error_correct_noop.parquet"  # 83w5286，使用 error_correct_noop 提示词，
+
+
+print(f"读取数据...{merge_path}")
 df = pd.read_parquet(merge_path)
 print(df.head(2))
+print(df.tail(2))
 print(f"数据形状: {df.shape}")
 print("\n列名:")
 print(df.columns.tolist())
-
-print("\n第3行详细信息：")
-third_row = df.iloc[2]
-for column, value in third_row.items():
-    print(f"{column}: {value} \n")
 
 # 检查重复率、两个任务(ability)各自的数量和比例、对于merge 包含正确句的比例、正确到正确的比例；对于x 正确到正确的比例；
 
@@ -78,7 +84,7 @@ if 'extra_info' in df.columns and 'ability' in df.columns:
     print(f"无效复合键数量: {invalid_count}")
     print(f"唯一复合键数量: {unique_count}")
     print(f"重复复合键数量: {duplicate_count}")
-    print(f"复合键重复率: {duplicate_rate:.4f} ({duplicate_rate*100:.2f}%)")
+    print(f"复合键重复率: {duplicate_rate*100:.2f}%")
     
     # 显示最常见的复合键
     print("\n最常见的 10 个复合键:")
@@ -104,21 +110,24 @@ if 'extra_info' in df.columns and 'ability' in df.columns:
         
     # 额外分析：按 ability 分组统计重复率
     print("\n=== 按 ability 分组的重复率分析 ===")
-    ability_groups = {}
-    for composite_key in composite_keys:
-        if composite_key is None:
-            continue
-        src, ability = composite_key.split("|||")
-        if ability not in ability_groups:
-            ability_groups[ability] = []
-        ability_groups[ability].append(composite_key)
-    
-    for ability, keys in ability_groups.items():
-        total = len(keys)
-        unique = len(set(keys))
-        dup_rate = (total - unique) / total if total > 0 else 0
-        print(f"ability '{ability}': {total} 条记录, {unique} 个唯一复合键, "
-              f"重复率 {dup_rate:.4f} ({dup_rate*100:.2f}%)")
+    try:
+        ability_groups = {}
+        for composite_key in composite_keys:
+            if composite_key is None:
+                continue
+            src, ability = composite_key.split("|||")
+            if ability not in ability_groups:
+                ability_groups[ability] = []
+            ability_groups[ability].append(composite_key)
+        
+        for ability, keys in ability_groups.items():
+            total = len(keys)
+            unique = len(set(keys))
+            dup_rate = (total - unique) / total if total > 0 else 0
+            print(f"ability '{ability}': {total} 条记录, {unique} 个唯一复合键, "
+                f"重复率{dup_rate*100:.2f}%")
+    except Exception as e:
+        print(f"处理 composite_keys 时出错 - {str(e)}")
 elif 'extra_info' not in df.columns:
     print("数据中没有 extra_info 字段")
 elif 'ability' not in df.columns:
@@ -188,7 +197,7 @@ def analyze_ability_specific_stats(df):
         
         if total_count > 0:
             match_ratio = src_tgt_match_count / total_count
-            print(f"src == tgt 的比例: {match_ratio:.4f} ({match_ratio*100:.2f}%)")
+            print(f"src == tgt 的比例: {match_ratio*100:.2f}%")
             results['correct_x_src_tgt_match_ratio'] = match_ratio
         else:
             print("没有找到有效的 src 和 tgt 字段")
@@ -245,7 +254,7 @@ def analyze_ability_specific_stats(df):
         # 输出 src == tgt 的结果
         if total_count > 0:
             match_ratio = src_tgt_match_count / total_count
-            print(f"src == tgt 的比例: {match_ratio:.4f} ({match_ratio*100:.2f}%)")
+            print(f"src == tgt 的比例: {match_ratio*100:.2f}%")
             results['correct_merge_src_tgt_match_ratio'] = match_ratio
         else:
             print("没有找到有效的 src 和 tgt 字段")
@@ -253,7 +262,7 @@ def analyze_ability_specific_stats(df):
         # 输出 jdt_map values 包含 src 的结果
         if jdt_total_count > 0:
             jdt_ratio = jdt_contains_tgt_count / jdt_total_count
-            print(f"jdt_map values 包含 tgt 的比例: {jdt_ratio:.4f} ({jdt_ratio*100:.2f}%)")
+            print(f"jdt_map values 包含 tgt 的比例: {jdt_ratio*100:.2f}%")
             results['correct_merge_jdt_contains_tgt_ratio'] = jdt_ratio
         else:
             print("没有找到有效的 source_line 和 jdt_map 字段")
@@ -267,12 +276,20 @@ results = analyze_ability_specific_stats(df)
 print("\n=== 汇总结果 ===")
 for key, value in results.items():
     if 'ratio' in key:
-        print(f"{key}: {value:.4f} ({value*100:.2f}%)")
+        print(f"{key}: {value*100:.2f}%")
     else:
         print(f"{key}: {value}")
 
 # 显示数据基本信息
 print("\n=== 数据基本信息 ===")
 print(df.info())
-print("\n前 5 行数据:")
-print(df.head())
+
+print("\n第3行详细信息：")
+third_row = df.iloc[2]
+for column, value in third_row.items():
+    print(f"{column}: {value} \n")
+
+print("\n第30行详细信息：")
+third_row = df.iloc[29]
+for column, value in third_row.items():
+    print(f"{column}: {value} \n")

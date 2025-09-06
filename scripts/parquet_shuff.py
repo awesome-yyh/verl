@@ -9,6 +9,9 @@ merge_path="data/anli_ft_correct_train.parquet"
 merge_path="data/anli_ft_correct_merge_test_shuffled.parquet"
 # merge_path="data/anli_ft_correct_merge_train_shuffled.parquet"
 merge_path="data/www_merge_拦截_correct_merge_train_deduplicated.parquet"
+merge_path = "data/www_merge_拦截_correct_merge_train_anli_ft_deduplicated.parquet"
+merge_path = "data/anli_ft_lanjie_merge_x_train_deduplicated.parquet"
+merge_path = "data/anli_ft_lanjie_merge_x_train_deduplicated_shuffled_all2x_deduplicated.parquet"
 
 save_path = merge_path.replace(".parquet", "_shuffled.parquet")
 

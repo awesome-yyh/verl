@@ -15,9 +15,9 @@ python scripts/txt2parquet_correct.py --input data/anli_ft.jsonl --output data/a
 
 python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/www_merge正报案例_6c95cea9-572b-4d52-8b06-40662069d770.csv_test_doubao_explanation-x.jsonl --output data/www_merge正报案例_6c95cea9-572b-4d52-8b06-40662069d770.csv_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
 
-python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/魔方拦截案例_f97589df-e3b8-47e2-aba4-62197fa5d667.csv_test_doubao_explanation-x.jsonl --output data/魔方拦截案例_f97589df-e3b8-47e2-aba4-62197fa5d667.csv_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
+python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/拦截案例_f97589df-e3b8-47e2-aba4-62197fa5d667.csv_test_doubao_explanation-x.jsonl --output data/拦截案例_f97589df-e3b8-47e2-aba4-62197fa5d667.csv_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
 
-python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/魔方误拦截all.csv_015f309d-b27d-4f16-9381-c3a737d403d8.txt_test_doubao_explanation-x.jsonl --output data/魔方误拦截all.csv_015f309d-b27d-4f16-9381-c3a737d403d8.txt_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
+python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/误拦截all.csv_015f309d-b27d-4f16-9381-c3a737d403d8.txt_test_doubao_explanation-x.jsonl --output data/误拦截all.csv_015f309d-b27d-4f16-9381-c3a737d403d8.txt_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
 
 python scripts/txt2parquet_correct.py --input ../term-corrector/data/merge/merge_wubao.csv_replace_key_acd4168d-f405-4791-afce-6f2c8e59fbad.csv_test_doubao_explanation-x.jsonl --output data/merge_wubao.csv_replace_key_acd4168d-f405-4791-afce-6f2c8e59fbad.csv_test_doubao_explanation-x_train.parquet --data_source anli_ft --split train
 
