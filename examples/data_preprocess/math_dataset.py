@@ -1,11 +1,3 @@
-'''
-Author: yangyahe yangyahe@midu.com
-Date: 2025-08-01 16:48:17
-LastEditors: yangyahe yangyahe@midu.com
-LastEditTime: 2025-08-05 10:41:58
-FilePath: /app/yangyahe/verl/examples/data_preprocess/math_dataset.py
-Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-'''
 # Copyright 2024 Bytedance Ltd. and/or its affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

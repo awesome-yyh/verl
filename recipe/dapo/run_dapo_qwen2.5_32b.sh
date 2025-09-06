@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-project_name='DAPO'
-exp_name='DAPO-Qwen2.5-0.5B'
-
 adv_estimator=grpo
 
 use_kl_in_reward=False
@@ -25,26 +22,34 @@ loss_agg_mode="token-mean"
 enable_filter_groups=True
 filter_groups_metric=acc
 max_num_gen_batches=10
-train_prompt_bsz=512
+train_prompt_bsz=128
 gen_prompt_bsz=$((train_prompt_bsz * 3))
-n_resp_per_prompt=16
 train_prompt_mini_bsz=32
+n_resp_per_prompt=16
 
 # Ray
-RAY_ADDRESS=${RAY_ADDRESS:-"http://localhost:8265"}
-WORKING_DIR=${WORKING_DIR:-"${PWD}"}
-RUNTIME_ENV=${RUNTIME_ENV:-"${WORKING_DIR}/verl/trainer/runtime_env.yaml"}
-# NNODES=${NNODES:-16}
+export RAY_ADDRESS="http://127.0.0.1:8265"
+export WORKING_DIR="${PWD}" 
+export RUNTIME_ENV="./recipe/dapo/runtime_env.yaml"
+
 NNODES=1
+
 # Paths
-RAY_DATA_HOME=${RAY_DATA_HOME:-"${HOME}/verl"}
-# MODEL_PATH=${MODEL_PATH:-"${RAY_DATA_HOME}/models/Qwen2.5-32B"}
-MODEL_PATH="/data/app/yangyahe/base_model/Qwen-Qwen2.5-0.5B-Instruct"
-CKPTS_DIR=${CKPTS_DIR:-"${RAY_DATA_HOME}/ckpts/${project_name}/${exp_name}"}
-# TRAIN_FILE=${TRAIN_FILE:-"${RAY_DATA_HOME}/data/dapo-math-17k.parquet"}
-TRAIN_FILE=/data/app/yangyahe/base_datasets/BytedTsinghua-SIA-DAPO-Math-17k/data/dapo-math-17k.parquet
-# TEST_FILE=${TEST_FILE:-"${RAY_DATA_HOME}/data/aime-2024.parquet"}
-TEST_FILE=/data/app/yangyahe/base_datasets/BytedTsinghua-SIA-AIME-2024/data/aime-2024.parquet
+RAY_DATA_HOME="${WORKING_DIR}/verl"
+MODEL_PATH="/mnt/public/yangyahe/base_model/Qwen-Qwen3-4B-Instruct-2507"
+TRAIN_FILE="/mnt/public/yangyahe/verl/data/anli_ft_lanjie_merge_x_train_deduplicated_shuffled_all2x_deduplicated_shuffled_error_correct_noop.parquet"
+TEST_FILE="/mnt/public/yangyahe/verl/data/anli_ft_lanjie_merge_x_test_deduplicated_shuffled_all2x_deduplicated_shuffled_error_correct_noop.parquet"
+
+experiment_name=$(basename "$MODEL_PATH")
+project_name='dapo_x_error_correct_noop'
+CKPTS_DIR="${WORKING_DIR}/checkpoints/${project_name}/${experiment_name}"
+
+# 创建检查点目录
+mkdir -p "${CKPTS_DIR}"
+
+micro_batch_size=0.80
+n_gpus_per_node=4
+save_freq=8
 
 # Algorithm
 temperature=1.0
@@ -52,14 +57,30 @@ top_p=1.0
 top_k=-1 # 0 for HF rollout, -1 for vLLM rollout
 val_top_p=0.7
 
+lr=1e-6
+
 # Performance Related Parameter
-sp_size=8
 use_dynamic_bsz=True
 actor_ppo_max_token_len=$((max_prompt_length + max_response_length))
 infer_ppo_max_token_len=$((max_prompt_length + max_response_length))
 offload=True
 gen_tp=4
+sp_size=4  # 与n_gpus_per_node匹配
 
+# 计算实际GPU数量
+total_gpus=$((NNODES * n_gpus_per_node))
+
+# 打印关键配置
+echo "=== Training Configuration ==="
+echo "Project: ${project_name} | Experiment: ${experiment_name}"
+echo "Nodes: ${NNODES} | GPUs per node: ${n_gpus_per_node} | Total GPUs: ${total_gpus}"
+echo "Model: ${MODEL_PATH}"
+echo "Train data: ${TRAIN_FILE}"
+echo "Checkpoints: ${CKPTS_DIR}"
+echo "Sequence Parallel Size: ${sp_size}"
+echo "Tensor Parallel Size: ${gen_tp}"
+
+# 启动训练任务
 ray job submit --no-wait --runtime-env="${RUNTIME_ENV}" \
     --working-dir "${WORKING_DIR}" \
     -- python3 -m recipe.dapo.main_dapo \
@@ -92,7 +113,7 @@ ray job submit --no-wait --runtime-env="${RUNTIME_ENV}" \
     actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=${infer_ppo_max_token_len} \
     actor_rollout_ref.model.path="${MODEL_PATH}" \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
-    actor_rollout_ref.actor.optim.lr=1e-6 \
+    actor_rollout_ref.actor.optim.lr=$lr \
     actor_rollout_ref.actor.optim.lr_warmup_steps=10 \
     actor_rollout_ref.actor.optim.weight_decay=0.1 \
     actor_rollout_ref.actor.ppo_mini_batch_size=${train_prompt_mini_bsz} \
@@ -102,7 +123,7 @@ ray job submit --no-wait --runtime-env="${RUNTIME_ENV}" \
     actor_rollout_ref.actor.grad_clip=1.0 \
     actor_rollout_ref.actor.loss_agg_mode=${loss_agg_mode} \
     actor_rollout_ref.actor.ulysses_sequence_parallel_size=${sp_size} \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.80 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=$micro_batch_size \
     actor_rollout_ref.rollout.tensor_model_parallel_size=${gen_tp} \
     actor_rollout_ref.rollout.enable_chunked_prefill=True \
     actor_rollout_ref.rollout.max_num_batched_tokens=$((max_prompt_length + max_response_length)) \
@@ -122,14 +143,15 @@ ray job submit --no-wait --runtime-env="${RUNTIME_ENV}" \
     reward_model.overlong_buffer.enable=${enable_overlong_buffer} \
     reward_model.overlong_buffer.len=${overlong_buffer_len} \
     reward_model.overlong_buffer.penalty_factor=${overlong_penalty_factor} \
-    trainer.logger='["console","wandb"]' \
+    trainer.logger='["console","tensorboard"]' \
     trainer.project_name="${project_name}" \
-    trainer.experiment_name="${exp_name}" \
-    trainer.n_gpus_per_node=1 \
+    trainer.experiment_name="${experiment_name}" \
+    trainer.n_gpus_per_node=$n_gpus_per_node \
     trainer.nnodes="${NNODES}" \
     trainer.val_before_train=True \
-    trainer.test_freq=5 \
-    trainer.save_freq=5 \
+    trainer.test_freq=20 \
+    trainer.save_freq=$save_freq \
     trainer.total_epochs=1 \
     trainer.default_local_dir="${CKPTS_DIR}" \
     trainer.resume_mode=auto
+

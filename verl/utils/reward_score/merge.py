@@ -1,11 +1,3 @@
-'''
-Author: yangyahe yangyahe@midu.com
-Date: 2025-08-04 08:44:16
-LastEditors: yangyahe yangyahe@midu.com
-LastEditTime: 2025-08-26 11:55:42
-FilePath: /app/yangyahe/verl/verl/utils/reward_score/wenxiu_merge.py
-Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-'''
 # Copyright 2024 Bytedance Ltd. and/or its affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,11 +23,11 @@ _SOLUTION_CLIP_CHARS = 512
 
 def extract_solution(solution_str):
     # 正则表达式，要求字符串以"## 修改说明"开头，并提取"## 输出结果"之后的内容和"## 修改说明"和"## 输出结果"之间的内容
-    solution_str = solution_str[:_SOLUTION_CLIP_CHARS]
+    solution_str = solution_str[:_SOLUTION_CLIP_CHARS].rpartition("</think>")[2].strip()
 
     mod_marker = "## 修改说明"
     result_marker = "## 输出结果"
-    pattern = rf'^{mod_marker}\s*:?\s*(.*?)\s*{result_marker}\s*:?\s*(.*)$'
+    pattern = rf'{mod_marker}\s*:?\s*(.*?)\s*{result_marker}\s*:?\s*(.*)'
     match = re.search(pattern, solution_str, re.DOTALL)  # re.DOTALL允许.匹配换行符
     if match:
         modification = match.group(1).strip()
@@ -46,8 +38,8 @@ def extract_solution(solution_str):
 def compute_score(solution_str, ground_truth, extra_info, format_score=0.1, modification_score=0.2, answer_score=0.7, debug=False):
     """The scoring function
     
-    ​​格式分 (0.2分)​​：只要格式正确（包含"## 修改说明"和"## 输出结果"），即使答案错误
-    ​​修改说明分 (0.1分)​​：修改说明长度≥10字符时获得
+    ​​格式分 (0.1分)​​：只要格式正确（包含"## 修改说明"和"## 输出结果"），即使答案错误
+    ​​修改说明分 (0.2分)​​：修改说明长度≥15字符时获得基础分，包含原词和建议词时获得更高分
     ​​答案分 (0.7分)​​：答案正确时获得
     ​​最高总分 (1.0分)​​：答案正确 + 修改说明充分
 
@@ -74,30 +66,100 @@ def compute_score(solution_str, ground_truth, extra_info, format_score=0.1, modi
     total_score += format_score
     
     # 2. 修改说明分数
-    total_score += modification_score if len(modification) >= 15 else 0
+    mod_score = 0.0
+    # total_score += modification_score if len(modification) >= 15 else 0
+    # 基础长度检查
+    if len(modification) >= 15:
+        mod_score += 0.1  # 基础分
+        
+        # 获取源文本和目标文本的差异
+        diffs = get_diff_details(src, tgt)
+        
+        # 检查修改说明中是否包含原词和建议词
+        contains_orig = False
+        contains_sugg = False
+        explains_action = False
+        
+        for diff in diffs:
+            if diff.startswith("Replace"):
+                try:
+                    # 提取原词和建议词
+                    parts = diff.split(": ", 1)[1]
+                    orig_word, sugg_word = parts.split(" --> ")
+                    
+                    # 检查修改说明中是否包含这些词
+                    if orig_word in modification:
+                        contains_orig = True
+                    if sugg_word in modification:
+                        contains_sugg = True
+                    
+                    # 检查是否解释了替换、插入或删除操作
+                    action_words = ["替换", "修改", "改为", "更改", "将", "改成"]
+                    for word in action_words:
+                        if word in modification:
+                            explains_action = True
+                            break
+                            
+                except Exception:
+                    pass
+            elif diff.startswith("Delete") or diff.startswith("Insert"):
+                # 对于删除和插入操作的检查
+                try:
+                    content = diff.split(": ", 1)[1]
+                    if content in modification:
+                        if diff.startswith("Delete"):
+                            contains_orig = True
+                        else:
+                            contains_sugg = True
+                    
+                    # 检查是否解释了操作
+                    action_words = ["删除", "移除", "去掉"] if diff.startswith("Delete") else ["添加", "插入", "增加"]
+                    for word in action_words:
+                        if word in modification:
+                            explains_action = True
+                            break
+                except Exception:
+                    pass
+        
+        # 如果源文本和目标文本相同（无需修改）
+        if src == tgt:
+            if "无需修改" in modification or "保持原文" in modification or "正确" in modification:
+                mod_score += 0.1  # 正确识别无需修改
+        else:
+            # 根据包含原词和建议词的情况加分
+            if contains_orig:
+                mod_score += 0.05
+            if contains_sugg:
+                mod_score += 0.05
+            if explains_action:
+                mod_score += 0.05
+    
+    # 确保修改说明分数不超过最大值
+    total_score += min(modification_score, mod_score)
     
     # 3. 答案评分
     if answer == tgt:
         total_score += answer_score
     else:  # 答案不正确
         # 分析错误修正情况
-        fixed_ratio = analyze_fixed_ratio(src, tgt, answer)
+        fixed_ratio, detected_ratio = analyze_fixed_ratio(src, tgt, answer)
         
         # 计算相对改进度
         edit_sim = calculate_edit_distance_score(answer, tgt)
         src_sim = calculate_edit_distance_score(src, tgt)
-        relative_improvement = edit_sim - src_sim
+        relative_improvement = max(0, edit_sim - src_sim)  # 确保改进值非负
         
         # 计算答案分数（使用连续的评分）
-        answer_score = answer_score * 0.5 * (  # 如果答案不正确，最多也只有0.5
+        answer_score = answer_score * 0.8 * (  # 如果答案不正确，最多也只有0.8
+            0.3 * detected_ratio + # 错误检测率
             0.4 * fixed_ratio +  # 错误修正率
-            0.6 * relative_improvement # 相对改进
+            0.3 * relative_improvement # 相对改进
         )
+        
         total_score += answer_score
     
     if debug or random.random() < 0.01:
-        print(f"==total_score: {total_score}")
-        print(f"merge_score: {solution_str}, \nsrc: {src}, \nllm: {answer}, \ntgt: {tgt}, ismodify: {answer != src}, istrue: {answer == tgt}, llm_diff: {get_diff_details(s1=src, s2=answer)}, should_diff: {get_diff_details(s1=src, s2=tgt)}, total_score: {total_score}")
+        print(f">> total_score: {total_score}, merge_score: {solution_str}, \nsrc: {src}, \nllm: {answer}, \ntgt: {tgt}, ismodify: {answer != src}, istrue: {answer == tgt}, llm_diff: {get_diff_details(s1=src, s2=answer)}, should_diff: {get_diff_details(s1=src, s2=tgt)}")
     
     return max(0.0, min(1.0, total_score))
 
@@ -134,10 +196,11 @@ def analyze_fixed_ratio(src: str, tgt: str, answer: str) -> float:
     
     orig_errors = get_diff_details(src, tgt)
     if not orig_errors:
-        return 1.0 if answer == tgt else 0.0
+        return (1.0, 1.0) if answer == tgt else (0.0, 0.0)
     
     total_weight = 0
     fixed_weight = 0
+    detected_weight = 0
     
     for error in orig_errors:
         # 获取错误类型
@@ -148,8 +211,10 @@ def analyze_fixed_ratio(src: str, tgt: str, answer: str) -> float:
         
         if is_error_fixed(error, src, answer, tgt):
             fixed_weight += weight
+        if is_error_detected(error, src, answer, tgt):
+            detected_weight += weight
     
-    return fixed_weight / total_weight if total_weight > 0 else 0.0
+    return (fixed_weight / total_weight, detected_weight / total_weight) if total_weight > 0 else (0.0, 0.0)
 
 def is_error_fixed(error: str, src: str, answer: str, tgt: str) -> bool:
     """检查特定错误是否被正确修复
@@ -177,8 +242,23 @@ def is_error_fixed(error: str, src: str, answer: str, tgt: str) -> bool:
             
             # 1. 检查原错误位置的内容是否被正确替换
             # 2. 检查替换后的文本是否与目标文本在该位置一致
-            return (answer[pos:pos+len(new)] == new and 
-                   answer[pos:pos+len(new)] == tgt[pos:pos+len(new)])
+            # 检查目标错误是否被正确修复
+            # 使用更可靠的方法：对比前后内容
+            context_len = min(5, pos)  # 使用上下文来确保位置匹配
+            before_ctx = src[max(0, pos-context_len):pos]
+            
+            # 在answer中找到对应上下文位置
+            try:
+                ctx_pos = answer.find(before_ctx)
+                if ctx_pos == -1:
+                    return False
+                    
+                fix_pos = ctx_pos + len(before_ctx)
+                # 检查替换后的内容是否正确
+                return answer[fix_pos:fix_pos+len(new)] == new
+            except Exception:
+                return False
+                
                 
         elif error.startswith("Delete"):
             parts = error.split(": ", 1)
@@ -189,15 +269,19 @@ def is_error_fixed(error: str, src: str, answer: str, tgt: str) -> bool:
             content = parts[1]
             
             # 检查要删除的内容是否确实被删除，且周围内容正确
-            context_range = 5  # 检查删除位置前后的上下文
-            before_src = src[max(0, pos-context_range):pos]
-            after_src = src[pos+len(content):pos+len(content)+context_range]
+            context_len = min(5, pos)  # 使用更少的上下文以增加匹配概率
+            before_src = src[max(0, pos-context_len):pos]
+            after_src = src[pos+len(content):pos+len(content)+context_len]
             
             # 在answer中找到对应上下文的位置
             try:
-                context_pos = answer.index(before_src + after_src)
-                return answer[context_pos:context_pos+len(before_src+after_src)] == before_src + after_src
-            except ValueError:
+                # 查找前后上下文的连接位置
+                connected = before_src + after_src
+                ctx_pos = answer.find(connected)
+                
+                # 如果找到了连接的上下文，说明内容被删除了
+                return ctx_pos != -1
+            except Exception:
                 return False
             
         elif error.startswith("Insert"):
@@ -209,8 +293,23 @@ def is_error_fixed(error: str, src: str, answer: str, tgt: str) -> bool:
             content = parts[1]
             
             # 检查内容是否在正确位置插入
-            return (answer[pos:pos+len(content)] == content and 
-                   answer[pos:pos+len(content)] == tgt[pos:pos+len(content)])
+            # return (answer[pos:pos+len(content)] == content == tgt[pos:pos+len(content)])
+            # 为了更准确地定位插入位置，使用上下文
+            context_len = min(5, pos)
+            before_ctx = src[max(0, pos-context_len):pos]
+            after_ctx = src[pos:pos+context_len]
+            
+            # 在answer中找对应位置
+            try:
+                before_pos = answer.find(before_ctx)
+                if before_pos == -1:
+                    return False
+                    
+                insert_pos = before_pos + len(before_ctx)
+                # 检查插入的内容是否正确
+                return answer[insert_pos:insert_pos+len(content)] == content
+            except Exception:
+                return False
                 
         return False
         
@@ -218,6 +317,95 @@ def is_error_fixed(error: str, src: str, answer: str, tgt: str) -> bool:
         print(f"Error in is_error_fixed: {e}")
         return False
 
+def is_error_detected(error: str, src: str, answer: str, tgt: str) -> bool:
+    """检查错误位置是否被识别和修改（不关心修改结果是否正确）
+    
+    Args:
+        error: 错误详情，格式如 "Replace X: old --> new" 或 "Delete X: content" 或 "Insert X: content"
+        src: 原始文本
+        answer: 模型生成的修改后文本
+        tgt: 目标正确文本（不再使用）
+    
+    Returns:
+        bool: 错误位置是否被修改（即错误被发现）
+    """
+    try:
+        # 改进检测逻辑，使用上下文确定位置
+        if error.startswith("Replace"):
+            parts = error.split(": ", 1)
+            if len(parts) != 2:
+                return False
+                
+            pos = int(parts[0].split()[1])
+            content = parts[1]
+            old, _ = content.split(" --> ")
+            
+            # 使用上下文确定位置
+            context_len = min(5, pos)
+            before_ctx = src[max(0, pos-context_len):pos]
+            
+            try:
+                ctx_pos = answer.find(before_ctx)
+                if ctx_pos == -1:
+                    return True  # 上下文也变了，说明有修改
+                    
+                check_pos = ctx_pos + len(before_ctx)
+                # 只要这个位置的内容发生了变化，就认为错误被检测到
+                return check_pos >= len(answer) or answer[check_pos:check_pos+len(old)] != old
+            except Exception:
+                return False
+                
+        elif error.startswith("Delete"):
+            parts = error.split(": ", 1)
+            if len(parts) != 2:
+                return False
+                
+            pos = int(parts[0].split()[1])
+            content = parts[1]
+            
+            # 使用上下文
+            context_len = min(5, pos)
+            before_ctx = src[max(0, pos-context_len):pos]
+            after_ctx = src[pos+len(content):pos+len(content)+context_len]
+            
+            # 检查原内容是否被删除
+            try:
+                # 如果能找到前后上下文的连接，说明内容被删除了
+                connected = before_ctx + after_ctx
+                return answer.find(connected) != -1
+            except Exception:
+                return False
+            
+        elif error.startswith("Insert"):
+            parts = error.split(": ", 1)
+            if len(parts) != 2:
+                return False
+                
+            pos = int(parts[0].split()[1])
+            
+            # 使用上下文
+            context_len = min(5, pos)
+            before_ctx = src[max(0, pos-context_len):pos]
+            after_ctx = src[pos:pos+context_len]
+            
+            # 检查是否在此位置有插入
+            try:
+                before_pos = answer.find(before_ctx)
+                if before_pos == -1:
+                    return True  # 上下文也变了，说明有修改
+                    
+                after_pos = answer.find(after_ctx, before_pos + len(before_ctx))
+                # 如果前后上下文距离变长，说明有内容被插入
+                return after_pos > before_pos + len(before_ctx)
+            except Exception:
+                return False
+                
+        return False
+        
+    except Exception as e:
+        print(f"Error in is_error_detected: {e}")
+        return False
+    
 def calculate_ngram_repetition_rate(text: str, n: int = 4, threshold: int = 0.4) -> float:
     """计算文本的n-gram重复率"""
     tokens = list(text.strip())
@@ -328,16 +516,18 @@ def test_error_fixing():
     
     for case in test_cases:
         errors = get_diff_details(case["src"], case["tgt"])
-        fixed_ratio = analyze_fixed_ratio(case["src"], case["tgt"], case["answer"])
-        print(f"\nerrors: {errors}, fixed_ratio: {fixed_ratio}")
+        fixed_ratio, detected_ratio = analyze_fixed_ratio(case["src"], case["tgt"], case["answer"])
+        print(f"\nerrors: {errors}, fixed_ratio: {fixed_ratio}, detected_ratio: {detected_ratio}")
         for error in errors:
-            result = is_error_fixed(error, case["src"], case["answer"], case["tgt"])
             print(f"Test case:")
             print(f"Source: {case['src']}")
             print(f"Target: {case['tgt']}")
             print(f"Answer: {case['answer']}")
             print(f"Info: {case['info']}")
             print(f"Error: {error}")
+            result = is_error_fixed(error, case["src"], case["answer"], case["tgt"])
+            print(f"=== Fixed: {result}")
+            result = is_error_detected(error, case["src"], case["answer"], case["tgt"])
             print(f"=== Fixed: {result}")
         print("score:", compute_score(solution_str=f"## 修改说明 11ghjvhjjbn## 输出结果\n{case['answer']}", ground_truth=case['tgt'], extra_info={"src": case['src']}, debug=True))
 

@@ -1,12 +1,4 @@
 set -x
-###
- # @Author: yangyahe yangyahe@midu.com
- # @Date: 2025-08-26 11:58:14
- # @LastEditors: yangyahe yangyahe@midu.com
- # @LastEditTime: 2025-08-26 11:59:48
- # @FilePath: /app/yangyahe/verl/examples/grpo_trainer/run_grpo_qwen_merge.sh
- # @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-### 
 
 # 包含正确句的比例: 394621 / 787030 = 0.50, 正确到正确的比例: 248742 / 787030 = 0.32
 # 包含正确句的比例: 502 / 968 = 0.52, 正确到正确的比例: 322 / 968 = 0.33
@@ -15,9 +7,12 @@ set -x
 # merge_test_path="data/anli_ft_test_system_tgt_add_src.parquet"
 # project_name=verl_grpo_merge
 
-merge_train_path="data/anli_ft_correct_merge_train_shuffled_shuffled.parquet"
-merge_test_path="data/anli_ft_correct_merge_test_shuffled_shuffled.parquet"
-project_name=verl_grpo_correct_merge
+# merge_train_path="../term-corrector/data/anli_ft_correct_merge_train_shuffled_shuffled.parquet"
+# merge_train_path="../term-corrector/data/www_merge_拦截_correct_merge_train_anli_ft_deduplicated_shuffled.parquet"
+# merge_test_path="../term-corrector/data/anli_ft_correct_merge_test_shuffled_shuffled.parquet"
+merge_train_path="data/anli_ft_lanjie_merge_x_train_deduplicated_shuffled_all2x_deduplicated_shuffled_error_correct_noop.parquet"
+merge_test_path="data/anli_ft_lanjie_merge_x_test_deduplicated_shuffled_all2x_deduplicated_shuffled_error_correct_noop.parquet"
+project_name=verl_grpo_correct_merge2e6_error_correct_noop
 
 # merge_train_path="data/anli_ft_correct_train.parquet"
 # merge_test_path="data/anli_ft_correct_test.parquet"
@@ -28,10 +23,13 @@ project_name=verl_grpo_correct_merge
 train_files="['$merge_train_path']"
 test_files="['$merge_test_path']"
 
-MODEL_PATH=/data/app/yangyahe/base_model/Qwen-Qwen2.5-1.5B-Instruct
-# MODEL_PATH=/data/app/yangyahe/base_model/Qwen-Qwen2.5-3B-Instruct
+# MODEL_PATH=../base_model/Qwen-Qwen2.5-1.5B-Instruct
+MODEL_PATH=../base_model/Qwen-Qwen2.5-3B-Instruct
 # MODEL_PATH=checkpoints/verl_grpo_merge/Qwen-Qwen2.5-3B-Instruct/global_step_1548/actor-hf_model
-# MODEL_PATH=/data/app/yangyahe/base_model/Qwen-Qwen3-4B-Instruct-2507
+MODEL_PATH=../base_model/Qwen-Qwen3-4B-Instruct-2507
+# MODEL_PATH=hf_newtoken # 同上，grpo558之后+sft
+# MODEL_PATH=hf_modelnewtoken_justsft  # 同上，直接sft
+# MODEL_PATH=../term-corrector/checkpoints/verl_grpo_correct_merge/Qwen-Qwen2.5-3B-Instruct/global_step_558-actor-hf
 
 # 太大会oom
 # merge_test_path
@@ -41,16 +39,16 @@ MODEL_PATH=/data/app/yangyahe/base_model/Qwen-Qwen2.5-1.5B-Instruct
 # 32/32/32: Training Progress:   4%|▎         | 49/1395 [05:02<11:23:38, 30.47s/it]
 # 1024/32/32: 几分钟直接训练完...
 
-train_batch_size=4  # train_batch_size * rollout_n 即为每次rollout（采样）阶段收集的总样本数量
-ppo_mini_batch_size=4  # 采样的响应被划分的batch，用于更新actor，是所有worker的全局大小
-micro_batch_size=4 # 每个GPU实际一次处理的样本数, 用于将mini_batch进一步划分，以适应GPU内存限制, 如果出现OOM，优先减小micro_batch_size
-gpu_memory_utilization=0.5
+train_batch_size=128  # train_batch_size * rollout_n 即为每次rollout（采样）阶段收集的总样本数量
+ppo_mini_batch_size=64  # 采样的响应被划分的batch，用于更新actor，是所有worker的全局大小
+micro_batch_size=32 # 每个GPU实际一次处理的样本数, 用于将mini_batch进一步划分，以适应GPU内存限制, 如果出现OOM，优先减小micro_batch_size
+gpu_memory_utilization=0.75
 n_gpus_per_node=4
-CUDA_VISIBLE_DEVICES="4,5,6,7"
-save_freq=32
+CUDA_VISIBLE_DEVICES="0,1,2,3"
+save_freq=80
 
 # 太大会训练不稳定
-lr=1e-6
+lr=2e-6
 kl_loss_coef=0.001
 rollout_n=8  # grpo的群组大小
 
@@ -101,5 +99,5 @@ python3 -m verl.trainer.main_ppo \
     trainer.n_gpus_per_node=$n_gpus_per_node \
     trainer.nnodes=1 \
     trainer.save_freq=$save_freq \
-    trainer.test_freq=2 \
+    trainer.test_freq=20 \
     trainer.total_epochs=15 $@

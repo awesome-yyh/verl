@@ -1,13 +1,3 @@
-'''
-Author: yangyahe yangyahe@midu.com
-Date: 2025-08-20 15:20:09
-LastEditors: yangyahe yangyahe@midu.com
-LastEditTime: 2025-08-20 15:41:30
-FilePath: /app/yangyahe/verl/scripts/parquet_merge.py
-Description: 
-合并纠错和魔方 等多个parquet文件
-注意：还需要shuff
-'''
 import pandas as pd
 from pathlib import Path
 

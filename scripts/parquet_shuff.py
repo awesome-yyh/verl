@@ -1,12 +1,3 @@
-'''
-Author: yangyahe yangyahe@midu.com
-Date: 2025-08-18 17:22:25
-LastEditors: yangyahe yangyahe@midu.com
-LastEditTime: 2025-08-20 15:49:24
-FilePath: /app/yangyahe/verl/scripts/parquet_shuff.py
-Description: 随机打乱parquet文件
-'''
-
 import pandas as pd
 import numpy as np
 

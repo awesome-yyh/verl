@@ -5,8 +5,10 @@ from collections import Counter
 # 文件路径
 # merge_path="data/anli_ft_correct_merge_train_shuffled_shuffled.parquet"
 # merge_path="data/anli_ft_correct_merge_test_shuffled_shuffled.parquet"
-merge_path="data/www_merge_拦截_correct_merge_train_deduplicated_shuffled.parquet"
-merge_path="data/www_merge_拦截_correct_merge_train_anli_ft_deduplicated_shuffled.parquet"
+merge_path="../term-corrector/data/www_merge_拦截_correct_merge_train_deduplicated_shuffled.parquet"
+merge_path="../term-corrector/data/www_merge_拦截_correct_merge_train_anli_ft_deduplicated_shuffled.parquet"
+# merge_path="../term-corrector/data/anli_ft_correct_merge_test_shuffled_shuffled.parquet"
+merge_path="data/anli_ft_lanjie_merge_x_train_deduplicated_shuffled_all2x_deduplicated_shuffled_error_correct_noop.parquet"
 
 print("读取数据...")
 df = pd.read_parquet(merge_path)
